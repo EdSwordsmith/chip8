@@ -4,5 +4,6 @@ pkgs.mkShell {
     llvmPackages_19.clang-unwrapped
     lld_19
     wabt
+    gnumake
   ];
 }
