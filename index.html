@@ -6,29 +6,67 @@
     <title>Chip8 Emulator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-     body { background: orange; }
-
-      @media (min-aspect-ratio: 2/1) {
-        canvas {
-          position: absolute;
-          image-rendering: pixelated;
-          height: 90%;
-          left: 50%;
-          transform: translate(-50%, 5%);
-        }
+      body {
+        background: #002b5c;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        font-size: 1.2rem;
+        font-family: Helvetica, Arial, sans-serif;
       }
-      @media not (min-aspect-ratio: 2/1) {
-        canvas {
-          position: absolute;
-          image-rendering: pixelated;
-          width: 90%;
-          top: 50%;
-          transform: translate(5%, -50%);
-        }
+
+      .header {
+        height: 100%;
+        width: 95%;
+        max-height: 15vh;
+        display: flex;
+        text-transform: uppercase;
+        text-align: center;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      canvas {
+        width: 100%;
+        object-fit: contain;
+        max-width: 100vw;
+        max-height: 90vh;
+        aspect-ratio: 2 / 1;
+        image-rendering: pixelated;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      button {
+        background: #002b5c;
+        color: white;
+        border: 4px solid white;
+        border-radius: 10px;
+        margin: 5px;
+        padding: 10px;
+        font-weight: 900;
+        font-size: 1.2rem;
+        font-family: Helvetica, Arial, sans-serif;
+        cursor: pointer;
+        outline: none;
+      }
+
+      button:hover {
+        color: #002b5c;
+        background: white;
       }
     </style>
   </head>
   <body>
+    <div class="header">
+      <h1>My Chip8 Emulator</h1>
+    </div>
     <canvas id="canvas"></canvas>
     <script type="module" src="/main.js"></script>
   </body>
