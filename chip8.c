@@ -186,7 +186,7 @@ int cpu_cycle() {
       sound_timer = v[x];
       if (sound_timer > 0 && nn == 0)
         enable_sound();
-        break;
+      break;
     case 0x1E:
       i += v[x];
       break;

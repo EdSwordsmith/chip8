@@ -20,6 +20,75 @@ class Keymap {
   }
 }
 
+const open_button = document.querySelector("#open");
+const rom_picker = document.querySelector("#file");
+
+// prettier-ignore
+const font = new Uint8Array([
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+]);
+
+open_button.addEventListener("click", () => {
+  rom_picker.click();
+});
+
+rom_picker.addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.addEventListener("load", async () => {
+    const { instance } = await WebAssembly.instantiateStreaming(
+      fetch("./chip8.wasm"),
+      {
+        env: {
+          debug_byte: (number) => debug_hex(number, 2),
+          debug: (number) => debug_hex(number, 4),
+          clear_screen,
+          random,
+          flip_pixel,
+          is_key_down,
+          get_key,
+          enable_sound,
+          disable_sound,
+        },
+      },
+    );
+
+    const memory_buffer = instance.exports.memory.buffer;
+    function load_to_memory(ptr, data) {
+      const buffer = new Uint8Array(memory_buffer, ptr, data.length);
+      buffer.set(new Uint8Array(data));
+    }
+
+    const rom_ptr = instance.exports.ram.value + 0x200;
+    load_to_memory(rom_ptr, reader.result);
+
+    const font_sprites_ptr = instance.exports.ram.value + 0x050;
+    load_to_memory(font_sprites_ptr, font);
+
+    clear_screen();
+    start_emulator(instance);
+  });
+
+  reader.readAsArrayBuffer(file);
+});
+
 const canvas = document.querySelector("#canvas");
 canvas.width = 64;
 canvas.height = 32;
@@ -102,6 +171,34 @@ const [enable_sound, disable_sound] = (() => {
   return [enable_sound, disable_sound];
 })();
 
+const start_emulator = (() => {
+  let animation_frame_id, instance;
+  let previous_timestamp = 0;
+
+  function frame(timestamp) {
+    const elapsed = timestamp - previous_timestamp;
+    if (elapsed >= 16) {
+      previous_timestamp = timestamp;
+      instance.exports.update_timers();
+      for (let i = 0; i < elapsed; i++) if (instance.exports.cpu_cycle()) break;
+      ctx.drawImage(back_canvas, 0, 0);
+    }
+
+    animation_frame_id = requestAnimationFrame(frame);
+  }
+
+  return (wasm_instance) => {
+    if (animation_frame_id) cancelAnimationFrame(animation_frame_id);
+    disable_sound();
+
+    instance = wasm_instance;
+    requestAnimationFrame((timestamp) => {
+      previous_timestamp = timestamp;
+      animation_frame_id = requestAnimationFrame(frame);
+    });
+  };
+})();
+
 function clear_screen() {
   back_ctx.fillStyle = "#001F3D";
   back_ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -123,84 +220,5 @@ function debug_hex(value, digits) {
   console.log(hex.toUpperCase());
 }
 
-const { instance } = await WebAssembly.instantiateStreaming(
-  fetch("./chip8.wasm"),
-  {
-    env: {
-      debug_byte: (number) => debug_hex(number, 2),
-      debug: (number) => debug_hex(number, 4),
-      clear_screen,
-      random,
-      flip_pixel,
-      is_key_down,
-      get_key,
-      enable_sound,
-      disable_sound,
-    },
-  },
-);
-
-const memory_buffer = instance.exports.memory.buffer;
-const rom_ptr = instance.exports.ram.value + 0x200;
-const font_sprites_ptr = instance.exports.ram.value + 0x050;
-
-// prettier-ignore
-const font = new Uint8Array([
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-    0x20, 0x60, 0x20, 0x20, 0x70, // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
-]);
-
-async function load_rom(url) {
-  const req = await fetch(url);
-  const buffer = await req.arrayBuffer();
-  const data = new Uint8Array(buffer);
-  const rom = new Uint8Array(memory_buffer, rom_ptr, data.length);
-  rom.set(data);
-}
-
-function load_font(font) {
-  const font_sprites = new Uint8Array(
-    memory_buffer,
-    font_sprites_ptr,
-    font.length,
-  );
-  font_sprites.set(font);
-}
-
 clear_screen();
-load_font(font);
-await load_rom("./default.ch8");
-
-const start_emulator = (() => {
-  let previous_timestamp;
-  function step(timestamp) {
-    if (previous_timestamp === undefined) previous_timestamp = timestamp;
-    const elapsed = timestamp - previous_timestamp;
-    if (elapsed >= 16) {
-      previous_timestamp = timestamp;
-      instance.exports.update_timers();
-      for (let i = 0; i < elapsed; i++) if (instance.exports.cpu_cycle()) break;
-      ctx.drawImage(back_canvas, 0, 0);
-    }
-
-    requestAnimationFrame(step);
-  }
-
-  return () => requestAnimationFrame(step);
-})();
-
-start_emulator();
+ctx.drawImage(back_canvas, 0, 0);
